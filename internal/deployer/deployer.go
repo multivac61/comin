@@ -109,6 +109,10 @@ func showDeployment(padding string, d Deployment) {
 func (s State) Show(padding string) {
 	fmt.Printf("  Deployer\n")
 	if s.Deployment == nil {
+		if s.PreviousDeployment == nil {
+			fmt.Printf("%sNo deployment yet\n", padding)
+			return
+		}
 		showDeployment(padding, *s.PreviousDeployment)
 		return
 	}

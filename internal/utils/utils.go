@@ -4,12 +4,20 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 
 	"github.com/sirupsen/logrus"
 )
 
 func CominServiceRestart() error {
+	if runtime.GOOS == "darwin" {
+		return cominServiceRestartDarwin()
+	}
+	return cominServiceRestartLinux()
+}
+
+func cominServiceRestartLinux() error {
 	logrus.Infof("The comin.service unit file changed. Comin systemd service is now restarted...")
 	logrus.Infof("Restarting the systemd comin.service: 'systemctl restart --no-block comin.service'")
 	cmd := exec.Command("systemctl", "restart", "--no-block", "comin.service")
@@ -17,6 +25,17 @@ func CominServiceRestart() error {
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("command 'systemctl restart --no-block comin.service' fails with %s", err)
+	}
+	return nil
+}
+
+func cominServiceRestartDarwin() error {
+	logrus.Infof("Restarting comin service: 'launchctl kickstart -k system/com.github.nlewo.comin'")
+	cmd := exec.Command("/bin/launchctl", "kickstart", "-k", "system/com.github.nlewo.comin")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("command 'launchctl kickstart -k system/com.github.nlewo.comin' fails with %s", err)
 	}
 	return nil
 }
@@ -38,10 +57,37 @@ func FormatCommitMsg(msg string) string {
 }
 
 func ReadMachineId() (machineId string, err error) {
+	if runtime.GOOS == "darwin" {
+		return readMachineIdDarwin()
+	}
+	return readMachineIdLinux()
+}
+
+func readMachineIdLinux() (machineId string, err error) {
 	machineIdBytes, err := os.ReadFile("/etc/machine-id")
 	machineId = strings.TrimSuffix(string(machineIdBytes), "\n")
 	if err != nil {
 		return "", fmt.Errorf("can not read file '/etc/machine-id': %s", err)
 	}
 	return
+}
+
+func readMachineIdDarwin() (machineId string, err error) {
+	cmd := exec.Command("/usr/sbin/system_profiler", "SPHardwareDataType")
+	output, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("failed to get hardware UUID on macOS: %s", err)
+	}
+	
+	lines := strings.Split(string(output), "\n")
+	for _, line := range lines {
+		if strings.Contains(line, "Hardware UUID:") {
+			parts := strings.Split(line, ":")
+			if len(parts) >= 2 {
+				machineId = strings.TrimSpace(parts[1])
+				return machineId, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("could not find Hardware UUID in system_profiler output")
 }
