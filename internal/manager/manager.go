@@ -1,6 +1,9 @@
 package manager
 
 import (
+	"os"
+	"runtime"
+
 	"github.com/nlewo/comin/internal/builder"
 	"github.com/nlewo/comin/internal/deployer"
 	"github.com/nlewo/comin/internal/fetcher"
@@ -129,6 +132,16 @@ func (m *Manager) Run() {
 				if err := m.cominServiceRestartFunc(); err != nil {
 					logrus.Fatal(err)
 					return
+				}
+				
+				// On Darwin, check if we should exit after restart signal
+				if runtime.GOOS == "darwin" {
+					restartFlagPath := "/var/lib/comin/restart-required"
+					if _, err := os.Stat(restartFlagPath); err == nil {
+						logrus.Infof("Restart flag detected - exiting to allow launchd restart")
+						os.Remove(restartFlagPath)
+						os.Exit(0)
+					}
 				}
 			}
 		}

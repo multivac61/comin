@@ -30,13 +30,19 @@ func cominServiceRestartLinux() error {
 }
 
 func cominServiceRestartDarwin() error {
-	logrus.Infof("Restarting comin service: 'launchctl kickstart -k system/com.github.nlewo.comin'")
-	cmd := exec.Command("/bin/launchctl", "kickstart", "-k", "system/com.github.nlewo.comin")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("command 'launchctl kickstart -k system/com.github.nlewo.comin' fails with %s", err)
+	logrus.Infof("Comin service configuration changed - will restart after deployment")
+	
+	// On Darwin, create a flag file that signals the main process should exit
+	// after the current deployment completes. Launchd will automatically restart
+	// the process due to KeepAlive=true, which is more reliable than self-restart
+	
+	restartFlagPath := "/var/lib/comin/restart-required"
+	if err := os.WriteFile(restartFlagPath, []byte("restart after deployment"), 0644); err != nil {
+		logrus.Warnf("Failed to create restart flag: %s", err)
+		// Continue anyway - this is not critical for the deployment
 	}
+	
+	logrus.Infof("Restart flag created - comin will exit after deployment and launchd will restart it")
 	return nil
 }
 
