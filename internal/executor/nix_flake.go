@@ -72,6 +72,8 @@ type Output struct {
 }
 
 type Derivation struct {
+	// Nix 2.32+ adds a version field to the derivation JSON
+	Version int    `json:"version,omitempty"`
 	Outputs Output `json:"outputs"`
 }
 

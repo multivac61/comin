@@ -133,6 +133,8 @@ func showDerivationWithFlake(ctx context.Context, flakeUrl, hostname, systemAttr
 	var output map[string]Derivation
 	err = json.Unmarshal(stdout.Bytes(), &output)
 	if err != nil {
+		logrus.Errorf("nix: failed to parse derivation show output: %s", err)
+		logrus.Debugf("nix: raw output was: %s", stdout.String()[:min(500, len(stdout.String()))])
 		return
 	}
 	keys := make([]string, 0, len(output))
@@ -205,16 +207,14 @@ func cominUnitFileHashLinux() string {
 }
 
 func cominUnitFileHashDarwin() string {
-	logrus.Infof("nix: generating the comin service plist file sha256: 'launchctl print system/com.github.nlewo.comin'")
-	cmd := exec.Command("/bin/launchctl", "print", "system/com.github.nlewo.comin")
-	var stdout bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		logrus.Infof("nix: command 'launchctl print system/com.github.nlewo.comin' fails with '%s'", err)
+	plistPath := "/Library/LaunchDaemons/com.github.nlewo.comin.plist"
+	logrus.Infof("nix: generating the comin service plist file sha256 from '%s'", plistPath)
+	content, err := os.ReadFile(plistPath)
+	if err != nil {
+		logrus.Infof("nix: failed to read plist file '%s': %s", plistPath, err)
 		return ""
 	}
-	sum := sha256.Sum256(stdout.Bytes())
+	sum := sha256.Sum256(content)
 	hash := fmt.Sprintf("%x", sum)
 	logrus.Infof("nix: the comin service plist sha256 is '%s'", hash)
 	return hash

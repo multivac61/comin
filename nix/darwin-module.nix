@@ -42,18 +42,22 @@ in {
       chmod 755 /var/lib/comin
     '';
 
-    # Override launchd reload behavior for comin service to prevent hanging
-    # Comin manages its own restart through the deployment process
+    # Comin manages its own restart through the deployment process.
+    # This activation script ensures the service is running after activation,
+    # handling cases where launchd may not have started it automatically.
     system.activationScripts.extraActivation.text = lib.mkAfter ''
-      # Skip automatic reload of comin service - it manages its own lifecycle
       if [ -f /Library/LaunchDaemons/com.github.nlewo.comin.plist ]; then
-        # Ensure service is loaded but don't restart during activation
-        /bin/launchctl load -w /Library/LaunchDaemons/com.github.nlewo.comin.plist 2>/dev/null || true
-
-        # Check if the service is actually running, if not start it
-        if ! /bin/launchctl list | grep -q "com.github.nlewo.comin"; then
-          echo "Comin service not running, starting it..."
-          /bin/launchctl start com.github.nlewo.comin || true
+        # Check if service is loaded (launchctl print succeeds if loaded)
+        if /bin/launchctl print system/com.github.nlewo.comin &>/dev/null; then
+          # Service is loaded, check if it has a PID (is running)
+          if ! /bin/launchctl print system/com.github.nlewo.comin 2>/dev/null | grep -q "pid = [0-9]"; then
+            echo "comin: service loaded but not running, starting..."
+            /bin/launchctl kickstart system/com.github.nlewo.comin || true
+          fi
+        else
+          # Service not loaded, load it (launchd will start it due to RunAtLoad)
+          echo "comin: loading service..."
+          /bin/launchctl load -w /Library/LaunchDaemons/com.github.nlewo.comin.plist || true
         fi
       fi
     '';
